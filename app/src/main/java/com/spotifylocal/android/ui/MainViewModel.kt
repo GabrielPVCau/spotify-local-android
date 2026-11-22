@@ -44,7 +44,7 @@ data class MainUiState(
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val prefs = PreferencesRepository(application)
-    private val syncManager = SyncManager(application)
+    private val syncManager = SyncManager(application, prefs.getOrCreateDeviceId())
     private val scanner = MusicScanner(application, syncManager)
 
     val playerController = PlayerController(application) { completedRelPath ->

@@ -10,7 +10,10 @@ import kotlinx.serialization.json.Json
 import java.time.Instant
 import java.time.OffsetDateTime
 
-class SyncManager(private val context: Context) {
+class SyncManager(
+    private val context: Context,
+    private val deviceId: String
+) {
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -19,10 +22,11 @@ class SyncManager(private val context: Context) {
         encodeDefaults = true
     }
 
+    private val deviceSyncFileName: String
+        get() = "$deviceId.json"
+
     companion object {
         const val SYNC_DIR_NAME = ".player-sync"
-        const val ANDROID_SYNC_FILE = "android.json"
-        const val DEVICE_ID = "android"
     }
 
     fun nowIsoUtc(): String = Instant.now().toString()
@@ -91,7 +95,7 @@ class SyncManager(private val context: Context) {
             )
             current.copy(
                 version = 1,
-                deviceId = DEVICE_ID,
+                deviceId = deviceId,
                 updatedAt = now,
                 tracks = current.tracks + (relPath to updatedEntry)
             )
@@ -110,7 +114,7 @@ class SyncManager(private val context: Context) {
                 )
                 current.copy(
                     version = 1,
-                    deviceId = DEVICE_ID,
+                    deviceId = deviceId,
                     updatedAt = now,
                     tracks = current.tracks + (relPath to updatedEntry)
                 )
@@ -133,7 +137,7 @@ class SyncManager(private val context: Context) {
             )
             current.copy(
                 version = 1,
-                deviceId = DEVICE_ID,
+                deviceId = deviceId,
                 updatedAt = now,
                 playlists = current.playlists + (playlistId to updatedEntry)
             )
@@ -147,15 +151,15 @@ class SyncManager(private val context: Context) {
             ?: root.createDirectory(SYNC_DIR_NAME)
             ?: return
 
-        val existingFile = syncDir.findFile(ANDROID_SYNC_FILE)?.takeIf { it.isFile }
+        val existingFile = syncDir.findFile(deviceSyncFileName)?.takeIf { it.isFile }
         val current = existingFile?.let { readSyncFile(it) } ?: SyncFile(
             version = 1,
-            deviceId = DEVICE_ID,
+            deviceId = deviceId,
             updatedAt = nowIsoUtc()
         )
 
         val updated = transform(current)
-        val targetFile = existingFile ?: syncDir.createFile("application/json", ANDROID_SYNC_FILE) ?: return
+        val targetFile = existingFile ?: syncDir.createFile("application/json", deviceSyncFileName) ?: return
         val payload = json.encodeToString(updated)
 
         runCatching {
