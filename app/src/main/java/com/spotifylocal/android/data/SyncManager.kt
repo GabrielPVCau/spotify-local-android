@@ -8,11 +8,13 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.time.Instant
+import java.time.OffsetDateTime
 
 class SyncManager(private val context: Context) {
 
     private val json = Json {
         ignoreUnknownKeys = true
+        coerceInputValues = true
         prettyPrint = true
         encodeDefaults = true
     }
@@ -69,7 +71,7 @@ class SyncManager(private val context: Context) {
                 if (existing == null || isLaterTimestamp(entry.updatedAt, existing.updatedAt)) {
                     mergedPlaylists[playlistId] = MergedPlaylistMeta(
                         pinned = entry.pinned,
-                        sortOrder = entry.sortOrder,
+                        sortOrder = entry.sortOrder ?: 0,
                         updatedAt = entry.updatedAt
                     )
                 }
@@ -179,11 +181,16 @@ class SyncManager(private val context: Context) {
         return if (isLaterTimestamp(b, a)) b else a
     }
 
+    private fun parseIsoInstant(ts: String): Instant? {
+        return runCatching { OffsetDateTime.parse(ts).toInstant() }.getOrNull()
+            ?: runCatching { Instant.parse(ts) }.getOrNull()
+    }
+
     private fun isLaterTimestamp(candidate: String?, baseline: String?): Boolean {
         if (candidate.isNullOrBlank()) return false
         if (baseline.isNullOrBlank()) return true
-        val candInstant = runCatching { Instant.parse(candidate) }.getOrNull()
-        val baseInstant = runCatching { Instant.parse(baseline) }.getOrNull()
+        val candInstant = parseIsoInstant(candidate)
+        val baseInstant = parseIsoInstant(baseline)
         return if (candInstant != null && baseInstant != null) {
             candInstant.isAfter(baseInstant)
         } else {

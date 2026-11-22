@@ -67,7 +67,7 @@ data class SyncTrackEntry(
 @Serializable
 data class SyncPlaylistEntry(
     val pinned: Boolean = false,
-    @SerialName("sort_order") val sortOrder: Int = 0,
+    @SerialName("sort_order") val sortOrder: Int? = null,
     @SerialName("updated_at") val updatedAt: String = ""
 )
 
