@@ -4,6 +4,7 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.spotifylocal.android.data.LibraryCache
 import com.spotifylocal.android.data.MergedSyncData
 import com.spotifylocal.android.data.MusicScanner
 import com.spotifylocal.android.data.Playlist
@@ -44,6 +45,7 @@ data class MainUiState(
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val prefs = PreferencesRepository(application)
+    private val libraryCache = LibraryCache(application)
     private val syncManager = SyncManager(application, prefs.getOrCreateDeviceId())
     private val scanner = MusicScanner(application, syncManager)
 
@@ -82,14 +84,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun scanFolder(uri: Uri) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isScanning = true, statusMessage = null) }
-            val result = scanner.scanLibrary(uri)
+            val cached = libraryCache.load(uri)
+            if (cached != null && cached.tracks.isNotEmpty()) {
+                val instantResult = scanner.buildFromCache(uri, cached)
+                _uiState.update {
+                    it.copy(
+                        isScanning = false,
+                        allTracks = instantResult.allTracks,
+                        playlists = instantResult.playlists,
+                        folderName = instantResult.folderName,
+                        statusMessage = null
+                    )
+                }
+            } else {
+                _uiState.update { it.copy(isScanning = true, statusMessage = null) }
+            }
+
+            val cachedByRelPath = cached?.tracks?.associateBy { it.relPath }.orEmpty()
+            val freshResult = scanner.scanLibrary(uri, cachedByRelPath)
+            freshResult.cachedLibrary?.let { libraryCache.save(it) }
             _uiState.update {
                 it.copy(
                     isScanning = false,
-                    allTracks = result.allTracks,
-                    playlists = result.playlists,
-                    folderName = result.folderName
+                    allTracks = freshResult.allTracks,
+                    playlists = freshResult.playlists,
+                    folderName = freshResult.folderName
                 )
             }
         }
